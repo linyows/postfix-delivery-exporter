@@ -108,3 +108,23 @@ func TestParse_NotDelivery(t *testing.T) {
 		}
 	}
 }
+
+// nxadm/tail#25: partial lines are emitted indistinguishably from complete
+// ones. Reject them so they do not produce metrics with truncated labels
+// (e.g. node="ail-1" from "m" being lost, or status="def" from message cutoff).
+func TestParse_PartialLine(t *testing.T) {
+	cases := map[string]string{
+		"prefix lost - host starts the line": `ail-1 postfix/smtp[133]: 14080840640: to=<bob@ex228.warpmail.dev>, relay=ex228.warpmail.dev[133.125.70.228]:25, delay=0.14, delays=0.01/0.02/0.11/0, dsn=2.0.0, status=sent (250 2.0.0 Ok: queued as 33FDD8406D8)`,
+		"prefix lost - leading hyphen suffix": `-1 postfix/smtp[137]: 170AC84065C: to=<bob@ex228.warpmail.dev>, relay=ex228.warpmail.dev[133.125.70.228]:25, delay=195, delays=131/64/0/0, dsn=4.7.0, status=deferred (host ex228.warpmail.dev[133.125.70.228] refused to talk to me: 421 4.7.0 mx1 Error)`,
+		"suffix lost - status word only":     `Apr 30 16:28:38 msa1 postfix/smtp[133]: 14080840640: to=<bob@ex228.warpmail.dev>, relay=ex228.warpmail.dev[133.125.70.228]:25, delay=0.14, delays=0.01/0.02/0.11/0, dsn=2.0.0, status=def`,
+		"suffix lost - mid message":          `Apr 30 16:28:38 msa1 postfix/smtp[137]: 170AC84065C: to=<bob@ex228.warpmail.dev>, relay=ex228.warpmail.dev[133.125.70.228]:25, delay=195, delays=131/64/0/0, dsn=4.7.0, status=deferred (host ex228.warpmail.dev`,
+	}
+	for name, line := range cases {
+		t.Run(name, func(t *testing.T) {
+			_, err := Parse(line)
+			if !errors.Is(err, ErrNotDelivery) {
+				t.Errorf("Parse(%q) err = %v, want ErrNotDelivery", line, err)
+			}
+		})
+	}
+}

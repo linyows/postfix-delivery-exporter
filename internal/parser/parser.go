@@ -22,13 +22,18 @@ type Record struct {
 	Stages   [4]float64
 }
 
+// nxadm/tail (and its upstream hpcloud/tail) silently emits partial lines when
+// a non-atomic write straddles an EOF boundary (see nxadm/tail#25). The two
+// anchored regexes below reject such fragments: headerRE requires at least one
+// token (typically the syslog timestamp) before the host, and statusRE requires
+// the trailing "(message)" Postfix always emits after status=.
 var (
-	headerRE = regexp.MustCompile(`(\S+)\s+postfix/smtp\[\d+\]:\s+\S+:\s+(.*)$`)
+	headerRE = regexp.MustCompile(`^\S+(?:\s+\S+)*\s+(\S+)\s+postfix/smtp\[\d+\]:\s+\S+:\s+(.*)$`)
 	relayRE  = regexp.MustCompile(`relay=([^,\[\s]+)`)
 	delayRE  = regexp.MustCompile(`\bdelay=([\d.]+)`)
 	delaysRE = regexp.MustCompile(`\bdelays=([\d.]+)/([\d.]+)/([\d.]+)/([\d.]+)`)
 	dsnRE    = regexp.MustCompile(`\bdsn=(\d)\.(\d+)\.(\d+)`)
-	statusRE = regexp.MustCompile(`\bstatus=(\w+)(?:\s+\((.*)\))?\s*$`)
+	statusRE = regexp.MustCompile(`\bstatus=(\w+)\s+\((.*)\)\s*$`)
 	codeRE   = regexp.MustCompile(`\b([245]\d{2})\s+\d+\.\d+\.\d+`)
 )
 
